@@ -1,4 +1,5 @@
-// This is your Prisma schema file — production-grade, PostgreSQL-compatible
+// Prisma schema — B2B Seed Distribution Platform
+// PostgreSQL + Prisma ORM
 
 generator client {
   provider = "prisma-client-js"
@@ -11,59 +12,77 @@ datasource db {
 
 // ─── USER ───────────────────────────────────────────────────────────────────
 model User {
-  id          String   @id @default(uuid())
-  email       String   @unique
-  password    String
-  role        String   @default("buyer") // "admin" | "buyer"
+  id        String   @id @default(uuid())
+  name      String?
+  email     String   @unique
+  password  String
+  role      String   @default("distributor") // "admin" | "distributor"
 
-  // Profile
-  companyName String?
-  phone       String?
-
-  // KYC
-  gstNumber   String?
-  panNumber   String?
-  address     String?
-  state       String?
-  district    String?
-  pincode     String?
-  gstCertUrl  String?
-  kycStatus   String   @default("pending") // pending | approved | rejected
-  kycRejectionReason String?
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   orders      Order[]
+  distributor Distributor?
+}
+
+// ─── DISTRIBUTOR ─────────────────────────────────────────────────────────────
+// Separate entity for distributor-specific business info
+model Distributor {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  companyName    String
+  address        String
+  phone          String
+  state          String?
+  district       String?
+  pincode        String?
+
+  // KYC
+  gstNumber      String?
+  panNumber      String?
+  gstCertUrl     String?
+
+  approvalStatus String   @default("pending") // pending | approved | rejected
+  rejectionNote  String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([approvalStatus])
 }
 
 // ─── PRODUCT ─────────────────────────────────────────────────────────────────
 model Product {
-  id              String   @id @default(uuid())
-  name            String
-  crop            String
-  variety         String
-  description     String?
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  crop        String
+  variety     String
+  category    String   @default("Seeds") // Seeds | Fertilizer | Pesticide | Other
 
-  // Agronomic Specs
-  germinationRate Float    @default(92)
-  purity          Float    @default(98)
+  // Agronomic specs
+  germinationRate Float  @default(92)
+  purity          Float  @default(98)
   batchNumber     String
   testingDate     String
 
   // Trade
-  stock           Int
-  price           Float
-  moq             Int      @default(100)
-  gstRate         Float    @default(0)
+  price    Float
+  stock    Int
+  moq      Int      @default(100)
+  gstRate  Float    @default(0)
 
-  isActive        Boolean  @default(true)
-  isFeatured      Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  isFeatured Boolean  @default(false)
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  orderItems      OrderItem[]
+  orderItems OrderItem[]
+
+  @@index([category, isActive])
 }
 
 // ─── ORDER ───────────────────────────────────────────────────────────────────
@@ -73,21 +92,24 @@ model Order {
   userId      String
   user        User     @relation(fields: [userId], references: [id])
 
-  status      String   @default("pending") // pending|approved|shipped|delivered|cancelled
-  total       Float
-  notes       String?
+  totalAmount Float
+  status      String   @default("pending")
+  // pending | processing | shipped | completed | cancelled
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  items       OrderItem[]
+  items OrderItem[]
+
+  @@index([userId, status])
 }
 
 // ─── ORDER ITEM ───────────────────────────────────────────────────────────────
 model OrderItem {
   id        String  @id @default(uuid())
   orderId   String
-  order     Order   @relation(fields: [orderId], references: [id])
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String
   product   Product @relation(fields: [productId], references: [id])
   quantity  Int

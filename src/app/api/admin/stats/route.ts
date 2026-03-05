@@ -7,23 +7,23 @@ export async function GET() {
         const [
             totalUsers,
             approvedDistributors,
-            pendingKyc,
+            pendingDistributors,
             totalProducts,
             totalOrders,
             pendingOrders,
         ] = await Promise.all([
-            prisma.user.count({ where: { role: "buyer" } }),
-            prisma.user.count({ where: { kycStatus: "approved" } }),
-            prisma.user.count({ where: { kycStatus: "pending" } }),
+            prisma.user.count({ where: { role: "distributor" } }),
+            prisma.distributor.count({ where: { approvalStatus: "approved" } }),
+            prisma.distributor.count({ where: { approvalStatus: "pending" } }),
             prisma.product.count({ where: { isActive: true } }),
             prisma.order.count(),
             prisma.order.count({ where: { status: "pending" } }),
         ]);
 
-        // Revenue
+        // Revenue — use totalAmount field
         const revenueAgg = await prisma.order.aggregate({
-            _sum: { total: true },
-            where: { status: { in: ["approved", "shipped", "delivered"] } },
+            _sum: { totalAmount: true },
+            where: { status: { in: ["processing", "shipped", "completed"] } },
         });
 
         const startOfMonth = new Date();
@@ -31,9 +31,9 @@ export async function GET() {
         startOfMonth.setHours(0, 0, 0, 0);
 
         const monthlyRevAgg = await prisma.order.aggregate({
-            _sum: { total: true },
+            _sum: { totalAmount: true },
             where: {
-                status: { in: ["approved", "shipped", "delivered"] },
+                status: { in: ["processing", "shipped", "completed"] },
                 createdAt: { gte: startOfMonth },
             },
         });
@@ -43,30 +43,42 @@ export async function GET() {
             take: 8,
             orderBy: { createdAt: "desc" },
             include: {
-                user: { select: { companyName: true, email: true } },
+                user: {
+                    select: {
+                        name: true,
+                        email: true,
+                        distributor: { select: { companyName: true } },
+                    },
+                },
                 items: { include: { product: { select: { name: true, variety: true } } } },
             },
         });
 
-        // Recent KYC
-        const recentKyc = await prisma.user.findMany({
-            where: { role: "buyer" },
+        // Recent distributor applications
+        const recentDistributors = await prisma.distributor.findMany({
             take: 8,
             orderBy: { updatedAt: "desc" },
-            select: { id: true, companyName: true, email: true, state: true, kycStatus: true, updatedAt: true },
+            select: {
+                id: true,
+                companyName: true,
+                state: true,
+                approvalStatus: true,
+                updatedAt: true,
+                user: { select: { email: true } },
+            },
         });
 
         return NextResponse.json({
             totalUsers,
             approvedDistributors,
-            pendingKyc,
+            pendingKyc: pendingDistributors,
             totalProducts,
             totalOrders,
             pendingOrders,
-            totalRevenue: revenueAgg._sum.total ?? 0,
-            thisMonthRevenue: monthlyRevAgg._sum.total ?? 0,
+            totalRevenue: revenueAgg._sum.totalAmount ?? 0,
+            thisMonthRevenue: monthlyRevAgg._sum.totalAmount ?? 0,
             recentOrders,
-            recentKyc,
+            recentKyc: recentDistributors,
         });
     } catch (err) {
         console.error("[admin/stats]", err);
