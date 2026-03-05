@@ -23,7 +23,7 @@ export default function RegisterPage() {
 
     const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
-    const nextStep = () => {
+    const nextStep = async () => {
         setError("");
         if (step === 1) {
             if (!form.companyName || !form.email || !form.gstNumber || !form.panNumber || !form.password) {
@@ -31,26 +31,68 @@ export default function RegisterPage() {
             }
             if (form.password !== form.confirmPassword) return setError("Passwords do not match.");
             if (form.password.length < 8) return setError("Password must be at least 8 characters.");
+            // Step 1: create user account via API, then advance to step 2
+            return step1Submit();
         }
         if (step === 2) {
             if (!form.state || !form.district || !form.pincode || !form.address) {
                 return setError("Please fill all location fields.");
             }
+            setStep(3);
         }
-        setStep(step + 1);
     };
 
-    const submit = async () => {
+    // Step 1 — called when clicking "Continue" on Step 1 to create the user account
+    const step1Submit = async () => {
         setLoading(true);
         setError("");
         try {
             const res = await fetch("/api/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form),
+                body: JSON.stringify({
+                    companyName: form.companyName,
+                    email: form.email,
+                    gstNumber: form.gstNumber,
+                    panNumber: form.panNumber,
+                    phone: form.phone,
+                    password: form.password,
+                    address: "",
+                }),
             });
             const data = await res.json();
             if (!res.ok) return setError(data.error || "Registration failed");
+            setStep(2);
+        } catch {
+            setError("Network error. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Step 3 — called when clicking "Submit Application" with full distributor details
+    const submit = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const res = await fetch("/api/distributor/apply", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    companyName: form.companyName,
+                    email: form.email,
+                    gstNumber: form.gstNumber,
+                    panNumber: form.panNumber,
+                    phone: form.phone,
+                    state: form.state,
+                    district: form.district,
+                    pincode: form.pincode,
+                    address: form.address,
+                    gstCertUrl: form.gstCertUrl,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) return setError(data.error || "Submission failed");
             router.push("/pending-approval");
         } catch {
             setError("Network error. Please try again.");
@@ -58,6 +100,7 @@ export default function RegisterPage() {
             setLoading(false);
         }
     };
+
 
     return (
         <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
@@ -193,7 +236,9 @@ export default function RegisterPage() {
                                 <Link href="/login" className="btn btn-ghost btn-sm">Sign in instead</Link>
                             )}
                             {step < 3 ? (
-                                <button className="btn btn-primary" onClick={nextStep}>Continue →</button>
+                                <button className="btn btn-primary" onClick={nextStep} disabled={loading}>
+                                    {loading && step === 1 ? <span className="spinner" /> : "Continue →"}
+                                </button>
                             ) : (
                                 <button className="btn btn-primary" onClick={submit} disabled={loading}>
                                     {loading ? <span className="spinner" /> : "Submit Application"}
