@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
 
         const user = await prisma.user.findUnique({
             where: { email: email.toLowerCase().trim() },
+            include: { distributor: { select: { approvalStatus: true } } },
         });
 
         if (!user) {
@@ -24,17 +25,22 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
         }
 
+        // For admins, kycStatus = "approved". For distributors read from Distributor record.
+        const kycStatus = user.role === "admin"
+            ? "approved"
+            : (user.distributor?.approvalStatus ?? "pending");
+
         const token = await signToken({
             userId: user.id,
             email: user.email,
             role: user.role,
-            kycStatus: user.kycStatus,
+            kycStatus,
         });
 
         const res = NextResponse.json({
             success: true,
             role: user.role,
-            kycStatus: user.kycStatus,
+            kycStatus,
         });
 
         res.cookies.set("auth_token", token, {
@@ -47,7 +53,7 @@ export async function POST(req: NextRequest) {
 
         return res;
     } catch (err) {
-        console.error("[login]", err);
+        console.error("[auth/login]", err);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }

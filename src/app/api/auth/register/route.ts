@@ -25,29 +25,35 @@ export async function POST(req: NextRequest) {
 
         const hashed = await bcrypt.hash(password, 12);
 
+        // Create User + linked Distributor record in one transaction
         const user = await prisma.user.create({
             data: {
                 email: email.toLowerCase().trim(),
                 password: hashed,
-                role: "buyer",
-                kycStatus: "pending",
-                companyName: companyName.trim(),
-                gstNumber: gstNumber?.toUpperCase().trim(),
-                panNumber: panNumber?.toUpperCase().trim(),
-                phone: phone?.trim(),
-                state: state?.trim(),
-                district: district?.trim(),
-                pincode: pincode?.trim(),
-                address: address?.trim(),
-                gstCertUrl: gstCertUrl?.trim(),
+                role: "distributor",
+                distributor: {
+                    create: {
+                        companyName: companyName.trim(),
+                        address: (address ?? "").trim(),
+                        phone: (phone ?? "").trim(),
+                        state: state?.trim(),
+                        district: district?.trim(),
+                        pincode: pincode?.trim(),
+                        gstNumber: gstNumber?.toUpperCase().trim(),
+                        panNumber: panNumber?.toUpperCase().trim(),
+                        gstCertUrl: gstCertUrl?.trim(),
+                        approvalStatus: "pending",
+                    },
+                },
             },
+            include: { distributor: { select: { approvalStatus: true } } },
         });
 
         const token = await signToken({
             userId: user.id,
             email: user.email,
             role: user.role,
-            kycStatus: user.kycStatus,
+            kycStatus: user.distributor?.approvalStatus ?? "pending",
         });
 
         const res = NextResponse.json({ success: true, kycStatus: "pending" }, { status: 201 });
@@ -60,7 +66,7 @@ export async function POST(req: NextRequest) {
         });
         return res;
     } catch (err) {
-        console.error("[register]", err);
+        console.error("[auth/register]", err);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }

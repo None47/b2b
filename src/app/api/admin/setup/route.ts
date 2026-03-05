@@ -17,10 +17,10 @@ export async function POST(req: NextRequest) {
 
         const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
         if (existing) {
-            // Update role to admin if exists
+            // Promote existing user to admin
             const updated = await prisma.user.update({
                 where: { email: email.toLowerCase().trim() },
-                data: { role: "admin", kycStatus: "approved" },
+                data: { role: "admin" },
             });
             const token = await signToken({ userId: updated.id, email: updated.email, role: "admin", kycStatus: "approved" });
             const res = NextResponse.json({ success: true, message: "User promoted to admin" });
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
         const hashed = await bcrypt.hash(password, 12);
         const user = await prisma.user.create({
-            data: { email: email.toLowerCase().trim(), password: hashed, role: "admin", kycStatus: "approved", companyName: "Admin" },
+            data: { email: email.toLowerCase().trim(), password: hashed, role: "admin" },
         });
 
         const token = await signToken({ userId: user.id, email: user.email, role: "admin", kycStatus: "approved" });
