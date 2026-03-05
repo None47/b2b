@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
                 where: { email: email.toLowerCase().trim() },
                 data: { role: "admin" },
             });
-            const token = await signToken({ userId: updated.id, email: updated.email, role: "admin", kycStatus: "approved" });
+            const token = await signToken({ userId: updated.id, email: updated.email, role: "admin" });
             const res = NextResponse.json({ success: true, message: "User promoted to admin" });
             res.cookies.set("auth_token", token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 7 * 24 * 60 * 60, path: "/" });
             return res;
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
             data: { email: email.toLowerCase().trim(), password: hashed, role: "admin" },
         });
 
-        const token = await signToken({ userId: user.id, email: user.email, role: "admin", kycStatus: "approved" });
+        const token = await signToken({ userId: user.id, email: user.email, role: "admin" });
         const res = NextResponse.json({ success: true, message: "Admin created successfully" }, { status: 201 });
         res.cookies.set("auth_token", token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 7 * 24 * 60 * 60, path: "/" });
         return res;

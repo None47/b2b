@@ -4,7 +4,7 @@ export interface TokenPayload {
     userId: string;
     email: string;
     role: string;
-    kycStatus: string;
+    kycStatus?: string;
 }
 
 const getSecret = () =>
