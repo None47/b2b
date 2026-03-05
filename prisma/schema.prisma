@@ -1,0 +1,95 @@
+// This is your Prisma schema file — production-grade, PostgreSQL-compatible
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USER ───────────────────────────────────────────────────────────────────
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  password    String
+  role        String   @default("buyer") // "admin" | "buyer"
+
+  // Profile
+  companyName String?
+  phone       String?
+
+  // KYC
+  gstNumber   String?
+  panNumber   String?
+  address     String?
+  state       String?
+  district    String?
+  pincode     String?
+  gstCertUrl  String?
+  kycStatus   String   @default("pending") // pending | approved | rejected
+  kycRejectionReason String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders      Order[]
+}
+
+// ─── PRODUCT ─────────────────────────────────────────────────────────────────
+model Product {
+  id              String   @id @default(uuid())
+  name            String
+  crop            String
+  variety         String
+  description     String?
+
+  // Agronomic Specs
+  germinationRate Float    @default(92)
+  purity          Float    @default(98)
+  batchNumber     String
+  testingDate     String
+
+  // Trade
+  stock           Int
+  price           Float
+  moq             Int      @default(100)
+  gstRate         Float    @default(0)
+
+  isActive        Boolean  @default(true)
+  isFeatured      Boolean  @default(false)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  orderItems      OrderItem[]
+}
+
+// ─── ORDER ───────────────────────────────────────────────────────────────────
+model Order {
+  id          String   @id @default(uuid())
+  orderNumber String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  status      String   @default("pending") // pending|approved|shipped|delivered|cancelled
+  total       Float
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items       OrderItem[]
+}
+
+// ─── ORDER ITEM ───────────────────────────────────────────────────────────────
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+}
