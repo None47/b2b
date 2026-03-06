@@ -45,6 +45,19 @@ const TABS: { key: Tab; icon: string; label: string; countKey?: keyof Stats }[] 
     { key: "products", icon: "🌾", label: "Products" },
 ];
 
+const EMPTY_STATS: Stats = {
+    totalUsers: 0,
+    approvedDistributors: 0,
+    pendingKyc: 0,
+    totalProducts: 0,
+    totalOrders: 0,
+    pendingOrders: 0,
+    totalRevenue: 0,
+    thisMonthRevenue: 0,
+    recentOrders: [],
+    recentKyc: [],
+};
+
 export default function AdminDashboard() {
     const router = useRouter();
     const [tab, setTab] = useState<Tab>("overview");
@@ -64,15 +77,48 @@ export default function AdminDashboard() {
 
     const loadAll = useCallback(async () => {
         setLoading(true);
-        const [s, b, o, p] = await Promise.all([
-            fetch("/api/admin/stats").then(r => r.json()),
-            fetch("/api/admin/buyers").then(r => r.json()),
-            fetch("/api/orders").then(r => r.json()),
-            fetch("/api/products").then(r => r.json()),
-        ]);
-        setStats(s); setBuyers(Array.isArray(b) ? b : []);
-        setOrders(Array.isArray(o) ? o : []); setProducts(Array.isArray(p) ? p : []);
-        setLoading(false);
+        try {
+            const [statsRes, buyersRes, ordersRes, productsRes] = await Promise.all([
+                fetch("/api/admin/stats"),
+                fetch("/api/admin/buyers"),
+                fetch("/api/orders"),
+                fetch("/api/products"),
+            ]);
+
+            const statuses = [statsRes, buyersRes, ordersRes, productsRes].map((r) => r.status);
+            if (statuses.includes(401)) {
+                router.push("/login");
+                return;
+            }
+            if (statuses.includes(403)) {
+                router.push("/403");
+                return;
+            }
+
+            const [s, b, o, p] = await Promise.all([
+                statsRes.json(),
+                buyersRes.json(),
+                ordersRes.json(),
+                productsRes.json(),
+            ]);
+
+            setStats(
+                s && typeof s === "object" && Array.isArray(s.recentOrders) && Array.isArray(s.recentKyc)
+                    ? s
+                    : EMPTY_STATS
+            );
+            setBuyers(Array.isArray(b) ? b : []);
+            setOrders(Array.isArray(o) ? o : []);
+            setProducts(Array.isArray(p) ? p : []);
+        } catch {
+            setStats(EMPTY_STATS);
+            setBuyers([]);
+            setOrders([]);
+            setProducts([]);
+            showToast("Failed to load dashboard data", "error");
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
     useEffect(() => {
@@ -82,20 +128,41 @@ export default function AdminDashboard() {
     }, [loadAll, router]);
 
     const updateKyc = async (buyerId: string, kycStatus: string, reason?: string) => {
-        const r = await fetch("/api/admin/buyers", {
-            method: "PATCH", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ buyerId, kycStatus, kycRejectionReason: reason }),
-        });
-        if (r.ok) { showToast(`KYC ${kycStatus}`); setBuyers(prev => prev.map(b => b.id === buyerId ? { ...b, kycStatus } : b)); }
-        else showToast("Failed", "error");
+        try {
+            const r = await fetch("/api/admin/buyers", {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ buyerId, kycStatus, kycRejectionReason: reason }),
+            });
+            const data = await r.json();
+            if (!r.ok) {
+                showToast(data.error || "Failed", "error");
+                return;
+            }
+            showToast(`KYC ${kycStatus}`);
+            setBuyers(prev => prev.map(b => b.id === buyerId ? { ...b, kycStatus, kycRejectionReason: reason } : b));
+            loadAll();
+        } catch {
+            showToast("Failed", "error");
+        }
     };
 
     const updateOrder = async (orderId: string, status: string) => {
-        const r = await fetch(`/api/orders/${orderId}`, {
-            method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
-        });
-        if (r.ok) { showToast("Order updated"); setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o)); }
-        else showToast("Failed", "error");
+        try {
+            const r = await fetch(`/api/orders/${orderId}`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
+            });
+            const data = await r.json();
+            if (!r.ok) {
+                showToast(data.error || "Failed", "error");
+                return;
+            }
+            const nextStatus = typeof data?.status === "string" ? data.status : status;
+            showToast("Order updated");
+            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: nextStatus } : o));
+            loadAll();
+        } catch {
+            showToast("Failed", "error");
+        }
     };
 
     const fmt = (v: number) => `₹${v.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
@@ -326,7 +393,12 @@ export default function AdminDashboard() {
                                             <td>
                                                 <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={async () => {
                                                     if (!confirm("Deactivate product?")) return;
-                                                    await fetch(`/api/products/${p.id}`, { method: "DELETE" });
+                                                    const r = await fetch(`/api/products/${p.id}`, { method: "DELETE" });
+                                                    if (!r.ok) {
+                                                        const d = await r.json().catch(() => ({}));
+                                                        showToast(d.error || "Failed", "error");
+                                                        return;
+                                                    }
                                                     showToast("Product deactivated");
                                                     loadAll();
                                                 }}>Remove</button>
@@ -357,13 +429,31 @@ function AddProductModal({ onClose, showToast }: { onClose: () => void; showToas
     const set = (k: string, v: string | number) => setForm(p => ({ ...p, [k]: v }));
 
     const save = async () => {
+        if (!form.name || !form.crop || !form.variety || !form.batchNumber || !form.testingDate) {
+            showToast("Fill all required fields", "error");
+            return;
+        }
+        if (form.price <= 0 || form.stock <= 0 || form.moq <= 0) {
+            showToast("Price, stock and MOQ must be positive", "error");
+            return;
+        }
         setLoading(true);
-        const r = await fetch("/api/products", {
-            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
-        });
-        setLoading(false);
-        if (r.ok) { showToast("Product added"); onClose(); }
-        else { const d = await r.json(); showToast(d.error || "Failed", "error"); }
+        try {
+            const r = await fetch("/api/products", {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
+            });
+            if (r.ok) {
+                showToast("Product added");
+                onClose();
+                return;
+            }
+            const d = await r.json().catch(() => ({}));
+            showToast(d.error || "Failed", "error");
+        } catch {
+            showToast("Failed", "error");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (

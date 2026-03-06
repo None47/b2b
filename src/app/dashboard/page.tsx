@@ -21,13 +21,23 @@ export default function DashboardPage() {
     const router = useRouter();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
 
     const loadOrders = useCallback(async () => {
-        const res = await fetch("/api/orders");
-        if (res.status === 401) { router.push("/login"); return; }
-        const data = await res.json();
-        setOrders(Array.isArray(data) ? data : []);
-        setLoading(false);
+        setLoading(true);
+        setError("");
+        try {
+            const res = await fetch("/api/orders");
+            if (res.status === 401) { router.push("/login"); return; }
+            if (res.status === 403) { router.push("/pending-approval"); return; }
+            const data = await res.json();
+            setOrders(Array.isArray(data) ? data : []);
+        } catch {
+            setOrders([]);
+            setError("Failed to load orders. Please refresh.");
+        } finally {
+            setLoading(false);
+        }
     }, [router]);
 
     useEffect(() => { loadOrders(); }, [loadOrders]);
@@ -35,7 +45,7 @@ export default function DashboardPage() {
     const fmt = (v: number) => `₹${v.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
     const fmtD = (s: string) => new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
-    const totalSpend = orders.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
+    const totalSpend = orders.filter(o => o.status !== "cancelled").reduce((s, o) => s + Number(o.total || 0), 0);
 
     return (
         <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
@@ -76,6 +86,11 @@ export default function DashboardPage() {
 
                 {/* Orders table */}
                 <h2 className="heading-sm" style={{ marginBottom: 16, color: "var(--text)" }}>Order History</h2>
+                {error && (
+                    <div className="alert alert-danger" style={{ marginBottom: 16 }}>
+                        {error}
+                    </div>
+                )}
                 {loading ? (
                     <div style={{ textAlign: "center", padding: "48px", color: "var(--text-muted)" }}>
                         <span className="spinner-dark spinner" style={{ width: 28, height: 28 }} />

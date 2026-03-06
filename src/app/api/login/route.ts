@@ -14,24 +14,28 @@ export async function POST(req: NextRequest) {
 
         const user = await prisma.user.findUnique({
             where: { email: email.toLowerCase().trim() },
-            include: { distributor: { select: { approvalStatus: true } } },
+            include: { business: { select: { approvalStatus: true } } },
         });
 
         if (!user || !(await bcrypt.compare(password, user.password))) {
             return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
         }
 
+        const kycStatus = user.role === "admin"
+            ? "approved"
+            : (user.business?.approvalStatus ?? "pending");
+
         const token = await signToken({
             userId: user.id,
             email: user.email,
             role: user.role,
-            kycStatus: user.distributor?.approvalStatus ?? "approved",
+            kycStatus,
         });
 
         const res = NextResponse.json({
             success: true,
             role: user.role,
-            approvalStatus: user.distributor?.approvalStatus ?? null,
+            kycStatus,
         });
 
         res.cookies.set("auth_token", token, {

@@ -17,7 +17,7 @@ export default function PendingApprovalPage() {
                     <div style={{ fontSize: 64, marginBottom: 24 }}>⏳</div>
                     <h1 className="heading-md" style={{ marginBottom: 16, color: "var(--primary)" }}>Application Under Review</h1>
                     <p style={{ color: "var(--text-muted)", lineHeight: 1.75, marginBottom: 32 }}>
-                        Your distributor application is currently being reviewed by our team.
+                        Your business application is currently being reviewed by our team.
                         This typically takes <strong>1–2 business days</strong>. You will receive
                         an email notification once your KYC is approved.
                     </p>

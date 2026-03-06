@@ -25,13 +25,13 @@ export async function POST(req: NextRequest) {
 
         const hashed = await bcrypt.hash(password, 12);
 
-        // Create User + linked Distributor record in one transaction
+        // Create User + linked Business record in one transaction
         const user = await prisma.user.create({
             data: {
                 email: email.toLowerCase().trim(),
                 password: hashed,
-                role: "distributor",
-                distributor: {
+                role: "business",
+                business: {
                     create: {
                         companyName: companyName.trim(),
                         address: (address ?? "").trim(),
@@ -46,14 +46,14 @@ export async function POST(req: NextRequest) {
                     },
                 },
             },
-            include: { distributor: { select: { approvalStatus: true } } },
+            include: { business: { select: { approvalStatus: true } } },
         });
 
         const token = await signToken({
             userId: user.id,
             email: user.email,
             role: user.role,
-            kycStatus: user.distributor?.approvalStatus ?? "pending",
+            kycStatus: user.business?.approvalStatus ?? "pending",
         });
 
         const res = NextResponse.json({ success: true, kycStatus: "pending" }, { status: 201 });

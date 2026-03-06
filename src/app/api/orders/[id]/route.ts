@@ -3,6 +3,19 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth";
 import { cookies } from "next/headers";
 
+function toUiStatus(status: string): string {
+    if (status === "processing") return "approved";
+    if (status === "completed") return "delivered";
+    return status;
+}
+
+function toDbStatus(status: string): string | null {
+    if (status === "approved") return "processing";
+    if (status === "delivered") return "completed";
+    if (["pending", "processing", "shipped", "completed", "cancelled"].includes(status)) return status;
+    return null;
+}
+
 // GET /api/orders/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -19,7 +32,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                     select: {
                         name: true,
                         email: true,
-                        distributor: { select: { companyName: true } },
+                        business: { select: { companyName: true } },
                     },
                 },
                 items: { include: { product: true } },
@@ -29,7 +42,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         if (user.role !== "admin" && order.userId !== user.userId) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
-        return NextResponse.json(order);
+        return NextResponse.json({
+            ...order,
+            status: toUiStatus(order.status),
+            total: order.totalAmount,
+            user: {
+                ...order.user,
+                companyName: order.user.business?.companyName ?? order.user.name ?? order.user.email,
+            },
+        });
     } catch (err) {
         console.error("[orders/[id] GET]", err);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -48,16 +69,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         const { id } = await params;
         const body = await req.json();
-        const allowed = ["pending", "approved", "shipped", "delivered", "cancelled"];
-        if (body.status && !allowed.includes(body.status)) {
+        const nextStatus = body.status ? toDbStatus(body.status) : null;
+        if (body.status && !nextStatus) {
             return NextResponse.json({ error: "Invalid status" }, { status: 400 });
         }
 
         const order = await prisma.order.update({
             where: { id },
-            data: { ...(body.status ? { status: body.status } : {}) },
+            data: { ...(nextStatus ? { status: nextStatus } : {}) },
         });
-        return NextResponse.json(order);
+        return NextResponse.json({
+            ...order,
+            status: toUiStatus(order.status),
+            total: order.totalAmount,
+        });
     } catch (err) {
         console.error("[orders/[id] PATCH]", err);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -3,9 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth";
 import { cookies } from "next/headers";
 
-// POST /api/distributor/apply
-// Called at Step 3 of registration — updates the existing Distributor record
-// with full business details (address, docs) after the user account was created in Step 1.
+// POST /api/business/apply
 export async function POST(req: NextRequest) {
     try {
         const cookieStore = await cookies();
@@ -24,8 +22,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Company name, address, state and pincode are required" }, { status: 400 });
         }
 
-        // Upsert: create or update the Distributor record linked to the authenticated user
-        const distributor = await prisma.distributor.upsert({
+        const business = await prisma.business.upsert({
             where: { userId: authUser.userId },
             create: {
                 userId: authUser.userId,
@@ -56,11 +53,11 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            approvalStatus: distributor.approvalStatus,
-            message: "Distributor application submitted. Awaiting admin review.",
+            approvalStatus: business.approvalStatus,
+            message: "Business application submitted. Awaiting admin review.",
         });
     } catch (err) {
-        console.error("[/api/distributor/apply]", err);
+        console.error("[/api/business/apply]", err);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }

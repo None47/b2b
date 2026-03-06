@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
         const user = await prisma.user.findUnique({
             where: { email: email.toLowerCase().trim() },
-            include: { distributor: { select: { approvalStatus: true } } },
+            include: { business: { select: { approvalStatus: true } } },
         });
 
         if (!user) {
@@ -25,10 +25,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
         }
 
-        // For admins, kycStatus = "approved". For distributors read from Distributor record.
+        // For admins, kycStatus = "approved". For businesses read from Business record.
         const kycStatus = user.role === "admin"
             ? "approved"
-            : (user.distributor?.approvalStatus ?? "pending");
+            : (user.business?.approvalStatus ?? "pending");
 
         const token = await signToken({
             userId: user.id,

@@ -16,16 +16,25 @@ export default function ProductsPage() {
     const router = useRouter();
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
     const [search, setSearch] = useState("");
     const [cropFilter, setCropFilter] = useState("All");
 
     const load = useCallback(async () => {
-        const res = await fetch("/api/products");
-        if (res.status === 401) { router.push("/login"); return; }
-        if (res.status === 403) { router.push("/pending-approval"); return; }
-        const data = await res.json();
-        setProducts(Array.isArray(data) ? data : []);
-        setLoading(false);
+        setLoading(true);
+        setError("");
+        try {
+            const res = await fetch("/api/products");
+            if (res.status === 401) { router.push("/login"); return; }
+            if (res.status === 403) { router.push("/pending-approval"); return; }
+            const data = await res.json();
+            setProducts(Array.isArray(data) ? data : []);
+        } catch {
+            setProducts([]);
+            setError("Failed to load products. Please refresh.");
+        } finally {
+            setLoading(false);
+        }
     }, [router]);
 
     useEffect(() => { load(); }, [load]);
@@ -60,6 +69,11 @@ export default function ProductsPage() {
                     <h1 className="heading-md" style={{ color: "var(--primary)", marginBottom: 4 }}>Seed Catalog</h1>
                     <p className="caption">Browse certified seed varieties. All products are quality-tested and batch-tracked.</p>
                 </div>
+                {error && (
+                    <div className="alert alert-danger" style={{ marginBottom: 16 }}>
+                        {error}
+                    </div>
+                )}
 
                 {/* Filters */}
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 28, alignItems: "center" }}>

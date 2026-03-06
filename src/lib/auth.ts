@@ -8,9 +8,15 @@ export interface TokenPayload {
 }
 
 const getSecret = () =>
-    new TextEncoder().encode(
-        process.env.JWT_SECRET || "seedsco_fallback_jwt_secret_2024"
-    );
+    new TextEncoder().encode(getJwtSecret());
+
+function getJwtSecret(): string {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        throw new Error("JWT_SECRET is not set");
+    }
+    return secret;
+}
 
 export async function signToken(payload: TokenPayload): Promise<string> {
     return await new SignJWT({ ...payload })

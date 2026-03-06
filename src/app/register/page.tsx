@@ -70,12 +70,12 @@ export default function RegisterPage() {
         }
     };
 
-    // Step 3 — called when clicking "Submit Application" with full distributor details
+    // Step 3 — called when clicking "Submit Application" with full business details
     const submit = async () => {
         setLoading(true);
         setError("");
         try {
-            const res = await fetch("/api/distributor/apply", {
+            const res = await fetch("/api/business/apply", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

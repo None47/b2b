@@ -23,15 +23,26 @@ export default function ProductDetailPage() {
     const [error, setError] = useState("");
 
     const load = useCallback(async () => {
-        const res = await fetch(`/api/products/${id}`);
-        if (res.status === 401) { router.push("/login"); return; }
-        if (res.status === 403) { router.push("/pending-approval"); return; }
-        if (res.ok) {
+        if (!id) return;
+        setLoading(true);
+        setError("");
+        try {
+            const res = await fetch(`/api/products/${id}`);
+            if (res.status === 401) { router.push("/login"); return; }
+            if (res.status === 403) { router.push("/pending-approval"); return; }
+            if (!res.ok) {
+                setProduct(null);
+                return;
+            }
             const data = await res.json();
             setProduct(data);
             setQuantity(data.moq);
+        } catch {
+            setProduct(null);
+            setError("Failed to load product details. Please refresh.");
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     }, [id, router]);
 
     useEffect(() => { load(); }, [load]);
@@ -70,6 +81,7 @@ export default function ProductDetailPage() {
 
     if (!product) return (
         <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16 }}>
+            {error && <div className="alert alert-danger">{error}</div>}
             <p>Product not found</p>
             <Link href="/products" className="btn btn-primary">← Back to Catalog</Link>
         </div>

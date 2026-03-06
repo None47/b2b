@@ -18,13 +18,21 @@ const PUBLIC_API = [
 ];
 
 const getSecret = () =>
-    new TextEncoder().encode(process.env.JWT_SECRET || "seedsco_fallback_jwt_secret_2024");
+    new TextEncoder().encode(getJwtSecret());
+
+function getJwtSecret(): string {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        throw new Error("JWT_SECRET is not set");
+    }
+    return secret;
+}
 
 interface TokenPayload {
     userId: string;
     email: string;
     role: string;
-    kycStatus: string; // holds approvalStatus for distributors
+    kycStatus: string; // holds approvalStatus for businesses
 }
 
 async function decodeToken(token: string): Promise<TokenPayload | null> {
@@ -36,7 +44,7 @@ async function decodeToken(token: string): Promise<TokenPayload | null> {
     }
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
     const { pathname } = req.nextUrl;
     const token = req.cookies.get("auth_token")?.value;
     const user = token ? await decodeToken(token) : null;
@@ -62,10 +70,13 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next();
     }
 
-    // 2. Distributor dashboard routes — must be authenticated + approved
+    // 2. Business dashboard routes — must be authenticated + approved
     if (BUYER_ROUTES.some((r) => pathname.startsWith(r))) {
         if (!user) {
             return NextResponse.redirect(new URL("/login?redirect=" + encodeURIComponent(pathname), req.url));
+        }
+        if (user.role !== "admin" && user.kycStatus !== "approved") {
+            return NextResponse.redirect(new URL("/pending-approval", req.url));
         }
         return NextResponse.next();
     }
@@ -76,24 +87,26 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next();
     }
 
-    // 4. Product routes — approval gate for distributors
+    // 4. Product routes — approval gate for businesses
     if (PRODUCT_ROUTES.some((r) => pathname.startsWith(r))) {
+        if (!user) {
+            return isApi
+                ? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+                : NextResponse.redirect(new URL("/login?redirect=" + encodeURIComponent(pathname), req.url));
+        }
         if (user?.role === "admin") return NextResponse.next();
-        if (user) {
-            // kycStatus in token holds approvalStatus for distributors
-            if (user.kycStatus !== "approved") {
-                return isApi
-                    ? NextResponse.json({ error: "Distributor approval required" }, { status: 403 })
-                    : NextResponse.redirect(new URL("/pending-approval", req.url));
-            }
-            return NextResponse.next();
+        // kycStatus in token holds approvalStatus for businesses
+        if (user.kycStatus !== "approved") {
+            return isApi
+                ? NextResponse.json({ error: "Business approval required" }, { status: 403 })
+                : NextResponse.redirect(new URL("/pending-approval", req.url));
         }
         return NextResponse.next();
     }
 
     // 5. Auth pages — redirect already-authenticated users
     if (AUTH_ROUTES.some((r) => pathname.startsWith(r)) && user) {
-        const home = user.role === "admin" ? "/admin" : "/dashboard";
+        const home = user.role === "admin" ? "/admin" : (user.kycStatus === "approved" ? "/dashboard" : "/pending-approval");
         return NextResponse.redirect(new URL(home, req.url));
     }
 

@@ -3,7 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth";
 import { cookies } from "next/headers";
 
-// GET /api/orders — distributor's own orders, or all orders for admin
+function toUiStatus(status: string): string {
+    if (status === "processing") return "approved";
+    if (status === "completed") return "delivered";
+    return status;
+}
+
+// GET /api/orders — business's own orders, or all orders for admin
 export async function GET() {
     try {
         const cookieStore = await cookies();
@@ -19,7 +25,7 @@ export async function GET() {
                     select: {
                         name: true,
                         email: true,
-                        distributor: { select: { companyName: true, approvalStatus: true } },
+                        business: { select: { companyName: true, approvalStatus: true } },
                     },
                 },
                 items: {
@@ -30,7 +36,17 @@ export async function GET() {
             },
         });
 
-        return NextResponse.json(orders);
+        const normalized = orders.map((order) => ({
+            ...order,
+            status: toUiStatus(order.status),
+            total: order.totalAmount,
+            user: {
+                ...order.user,
+                companyName: order.user.business?.companyName ?? order.user.name ?? order.user.email,
+            },
+        }));
+
+        return NextResponse.json(normalized);
     } catch (err) {
         console.error("[orders GET]", err);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -45,14 +61,14 @@ export async function POST(req: NextRequest) {
         const user = token ? await verifyToken(token) : null;
         if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        // Check distributor is approved
-        if (user.role === "distributor") {
-            const distributor = await prisma.distributor.findUnique({
+        // Check business is approved
+        if (user.role === "distributor" || user.role === "business") {
+            const business = await prisma.business.findUnique({
                 where: { userId: user.userId },
                 select: { approvalStatus: true },
             });
-            if (!distributor || distributor.approvalStatus !== "approved") {
-                return NextResponse.json({ error: "Distributor approval required to place orders" }, { status: 403 });
+            if (!business || business.approvalStatus !== "approved") {
+                return NextResponse.json({ error: "Business approval required to place orders" }, { status: 403 });
             }
         }
 
@@ -115,7 +131,14 @@ export async function POST(req: NextRequest) {
             )
         );
 
-        return NextResponse.json(order, { status: 201 });
+        return NextResponse.json(
+            {
+                ...order,
+                status: toUiStatus(order.status),
+                total: order.totalAmount,
+            },
+            { status: 201 }
+        );
     } catch (err) {
         console.error("[orders POST]", err);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });

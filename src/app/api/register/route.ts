@@ -1,5 +1,5 @@
 // POST /api/register — public alias for /api/auth/register
-// Handles both plain user registration and distributor-specific registration
+// Handles both plain user registration and business-specific registration
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const {
             name, email, password,
-            // distributor fields (optional — if provided, creates Distributor record)
+            // business fields (optional — if provided, creates Business record)
             companyName, address, phone, state, district, pincode, gstNumber, panNumber, gstCertUrl,
         } = body;
 
@@ -28,16 +28,16 @@ export async function POST(req: NextRequest) {
 
         const hashed = await bcrypt.hash(password, 12);
 
-        // Create user + distributor profile in one transaction
+        // Create user + business profile in one transaction
         const user = await prisma.user.create({
             data: {
                 name: name?.trim(),
                 email: email.toLowerCase().trim(),
                 password: hashed,
-                role: "distributor",
-                // Create distributor record if business fields provided
+                role: "business",
+                // Create business record if business fields provided
                 ...(companyName ? {
-                    distributor: {
+                    business: {
                         create: {
                             companyName: companyName.trim(),
                             address: (address ?? "").trim(),
@@ -53,18 +53,18 @@ export async function POST(req: NextRequest) {
                     },
                 } : {}),
             },
-            include: { distributor: true },
+            include: { business: true },
         });
 
         const token = await signToken({
             userId: user.id,
             email: user.email,
             role: user.role,
-            kycStatus: user.distributor?.approvalStatus ?? "pending",
+            kycStatus: user.business?.approvalStatus ?? "pending",
         });
 
         const res = NextResponse.json(
-            { success: true, role: user.role, approvalStatus: user.distributor?.approvalStatus ?? null },
+            { success: true, role: user.role, approvalStatus: user.business?.approvalStatus ?? null },
             { status: 201 }
         );
         res.cookies.set("auth_token", token, {

@@ -21,7 +21,7 @@ export default function HomePage() {
                     </div>
                     <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                         <Link href="/login" className="btn btn-ghost btn-sm">Sign in</Link>
-                        <Link href="/register" className="btn btn-primary btn-sm">Become a Distributor</Link>
+                        <Link href="/register" className="btn btn-primary btn-sm">Register Business</Link>
                     </div>
                 </div>
             </nav>
@@ -46,7 +46,7 @@ export default function HomePage() {
                         </div>
                         <h1 className="heading-xl" style={{ color: "#fff", marginBottom: 24 }}>
                             Certified Seeds.<br />
-                            Direct to Distributors.
+                            Direct to Businesses.
                         </h1>
                         <p style={{ fontSize: "1.125rem", opacity: 0.85, lineHeight: 1.7, marginBottom: 40, maxWidth: 520 }}>
                             Join India&apos;s most trusted B2B seed distribution platform. Verified sellers,
@@ -54,7 +54,7 @@ export default function HomePage() {
                         </p>
                         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                             <Link href="/register" className="btn btn-xl" style={{ background: "#fff", color: "var(--primary)" }}>
-                                Register as Distributor →
+                                Register Business →
                             </Link>
                             <Link href="/login" className="btn btn-xl btn-outline" style={{ borderColor: "rgba(255,255,255,0.4)", color: "#fff" }}>
                                 Sign in
@@ -89,7 +89,7 @@ export default function HomePage() {
                         <div className="label" style={{ marginBottom: 12 }}>Platform Features</div>
                         <h2 className="heading-lg" style={{ color: "var(--primary)" }}>Built for B2B Agriculture</h2>
                         <p className="caption" style={{ marginTop: 12, maxWidth: 480, margin: "12px auto 0" }}>
-                            A complete workflow from distributor onboarding to order fulfilment.
+                            A complete workflow from business onboarding to order fulfilment.
                         </p>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>

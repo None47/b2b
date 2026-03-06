@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth";
 import { cookies } from "next/headers";
 
-// GET /api/distributors — list all distributors (admin only)
+// GET /api/businesses — list all businesses (admin only)
 export async function GET(req: NextRequest) {
     try {
         const cookieStore = await cookies();
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status"); // pending | approved | rejected
 
-        const distributors = await prisma.distributor.findMany({
+        const businesses = await prisma.business.findMany({
             where: status && status !== "all" ? { approvalStatus: status } : {},
             orderBy: { createdAt: "desc" },
             include: {
@@ -24,9 +24,9 @@ export async function GET(req: NextRequest) {
             },
         });
 
-        return NextResponse.json(distributors);
+        return NextResponse.json(businesses);
     } catch (err) {
-        console.error("[/api/distributors GET]", err);
+        console.error("[/api/businesses GET]", err);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }

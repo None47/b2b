@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth";
 import { cookies } from "next/headers";
 
-// GET /api/admin/buyers — list users with their distributor profiles
+// GET /api/admin/buyers — list users with their business profiles
 export async function GET(req: NextRequest) {
     try {
         const cookieStore = await cookies();
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status"); // pending | approved | rejected
 
-        const distributors = await prisma.distributor.findMany({
+        const businesses = await prisma.business.findMany({
             where: status && status !== "all" ? { approvalStatus: status } : {},
             orderBy: { createdAt: "desc" },
             include: {
@@ -24,14 +24,21 @@ export async function GET(req: NextRequest) {
             },
         });
 
-        return NextResponse.json(distributors);
+        const normalized = businesses.map((business) => ({
+            ...business,
+            email: business.user.email,
+            kycStatus: business.approvalStatus,
+            kycRejectionReason: business.rejectionNote,
+        }));
+
+        return NextResponse.json(normalized);
     } catch (err) {
         console.error("[admin/buyers GET]", err);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
 
-// PATCH /api/admin/buyers — approve or reject distributor application
+// PATCH /api/admin/buyers — approve or reject business application
 export async function PATCH(req: NextRequest) {
     try {
         const cookieStore = await cookies();
@@ -41,22 +48,29 @@ export async function PATCH(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        const { distributorId, approvalStatus, rejectionNote } = await req.json();
+        const body = await req.json();
+        const businessId = body.businessId ?? body.buyerId;
+        const approvalStatus = body.approvalStatus ?? body.kycStatus;
+        const rejectionNote = body.rejectionNote ?? body.kycRejectionReason;
 
         const allowed = ["approved", "rejected", "pending"];
-        if (!distributorId || !allowed.includes(approvalStatus)) {
-            return NextResponse.json({ error: "distributorId and valid approvalStatus required" }, { status: 400 });
+        if (!businessId || !allowed.includes(approvalStatus)) {
+            return NextResponse.json({ error: "businessId and valid approvalStatus required" }, { status: 400 });
         }
 
-        const distributor = await prisma.distributor.update({
-            where: { id: distributorId },
+        const business = await prisma.business.update({
+            where: { id: businessId },
             data: {
                 approvalStatus,
                 rejectionNote: approvalStatus === "rejected" ? rejectionNote : null,
             },
         });
 
-        return NextResponse.json({ success: true, approvalStatus: distributor.approvalStatus });
+        return NextResponse.json({
+            success: true,
+            approvalStatus: business.approvalStatus,
+            kycStatus: business.approvalStatus,
+        });
     } catch (err) {
         console.error("[admin/buyers PATCH]", err);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });

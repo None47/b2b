@@ -3,8 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth";
 import { cookies } from "next/headers";
 
-// POST /api/admin/approve-distributor
-// Body: { distributorId: string, action: "approve" | "reject", reason?: string }
+// POST /api/admin/approve-business
+// Body: { businessId: string, action: "approve" | "reject", reason?: string }
 export async function POST(req: NextRequest) {
     try {
         const cookieStore = await cookies();
@@ -14,10 +14,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        const { distributorId, action, reason } = await req.json();
+        const { businessId, action, reason } = await req.json();
 
-        if (!distributorId || !action) {
-            return NextResponse.json({ error: "distributorId and action are required" }, { status: 400 });
+        if (!businessId || !action) {
+            return NextResponse.json({ error: "businessId and action are required" }, { status: 400 });
         }
         if (!["approve", "reject"].includes(action)) {
             return NextResponse.json({ error: "action must be 'approve' or 'reject'" }, { status: 400 });
@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
 
         const approvalStatus = action === "approve" ? "approved" : "rejected";
 
-        const distributor = await prisma.distributor.update({
-            where: { id: distributorId },
+        const business = await prisma.business.update({
+            where: { id: businessId },
             data: {
                 approvalStatus,
                 rejectionNote: action === "reject" && reason ? reason : null,
@@ -38,12 +38,12 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            distributorId: distributor.id,
-            approvalStatus: distributor.approvalStatus,
-            companyName: distributor.companyName,
+            businessId: business.id,
+            approvalStatus: business.approvalStatus,
+            companyName: business.companyName,
         });
     } catch (err) {
-        console.error("[/api/admin/approve-distributor]", err);
+        console.error("[/api/admin/approve-business]", err);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }

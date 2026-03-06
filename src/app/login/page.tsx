@@ -46,7 +46,7 @@ export default function LoginPage() {
                     <div style={{ textAlign: "center", marginBottom: 32 }}>
                         <span style={{ fontSize: 48 }}>🌱</span>
                         <h1 className="heading-md" style={{ marginTop: 12, color: "var(--primary)" }}>Welcome back</h1>
-                        <p className="caption" style={{ marginTop: 6 }}>Sign in to your distributor account</p>
+                        <p className="caption" style={{ marginTop: 6 }}>Sign in to your business account</p>
                     </div>
 
                     <div className="card">
@@ -83,7 +83,7 @@ export default function LoginPage() {
                             </form>
                         </div>
                         <div className="card-footer" style={{ textAlign: "center", fontSize: "0.875rem", color: "var(--text-muted)" }}>
-                            New distributor?{" "}
+                            New business?{" "}
                             <Link href="/register" style={{ color: "var(--primary)", fontWeight: 600 }}>Register here</Link>
                         </div>
                     </div>
